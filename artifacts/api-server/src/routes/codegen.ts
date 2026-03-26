@@ -17,7 +17,7 @@ router.post("/generate", async (req, res) => {
     const systemPrompt = `You are an expert software engineer and coding assistant. When given a description, generate clean, well-structured, working code.${languageHint} Output only the code, no explanations unless the user asks for them. Use proper formatting and comments where helpful.`;
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-5.3-codex",
+      model: "gpt-5.2",
       max_completion_tokens: 8192,
       messages: [
         { role: "system", content: systemPrompt },
