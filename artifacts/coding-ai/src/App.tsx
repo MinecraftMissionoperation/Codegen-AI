@@ -19,7 +19,7 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate() {
-  const { user, token, loading, logout, updateUserInfo } = useAuth();
+  const { user, token, loading, login, register, checkUsername, logout, updateUserInfo } = useAuth();
   const [authView, setAuthView] = useState<"login" | "register">("login");
 
   if (loading) {
@@ -32,9 +32,20 @@ function AuthGate() {
 
   if (!user) {
     if (authView === "register") {
-      return <Register onSwitchToLogin={() => setAuthView("login")} />;
+      return (
+        <Register
+          onSwitchToLogin={() => setAuthView("login")}
+          register={register}
+          checkUsername={checkUsername}
+        />
+      );
     }
-    return <Login onSwitchToRegister={() => setAuthView("register")} />;
+    return (
+      <Login
+        onSwitchToRegister={() => setAuthView("register")}
+        login={login}
+      />
+    );
   }
 
   return (

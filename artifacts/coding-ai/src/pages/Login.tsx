@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Code2, Lock, User, Eye, EyeOff, LogIn } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 
 interface LoginProps {
   onSwitchToRegister: () => void;
+  login: (username: string, password: string) => Promise<string | null>;
 }
 
-export default function Login({ onSwitchToRegister }: LoginProps) {
-  const { login } = useAuth();
+export default function Login({ onSwitchToRegister, login }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -21,8 +20,11 @@ export default function Login({ onSwitchToRegister }: LoginProps) {
     setLoading(true);
     setError(null);
     const err = await login(username.trim(), password);
-    if (err) setError(err);
-    setLoading(false);
+    if (err) {
+      setError(err);
+      setLoading(false);
+    }
+    // If no error, AuthGate re-renders with user set — no need to setLoading(false)
   };
 
   return (
@@ -59,6 +61,7 @@ export default function Login({ onSwitchToRegister }: LoginProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="your username"
                   autoComplete="username"
+                  autoFocus
                   disabled={loading}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50"
                 />

@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Code2, Lock, User, Eye, EyeOff, UserPlus, CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 
 interface RegisterProps {
   onSwitchToLogin: () => void;
+  register: (username: string, password: string) => Promise<string | null>;
+  checkUsername: (username: string) => Promise<boolean>;
 }
 
 type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
-export default function Register({ onSwitchToLogin }: RegisterProps) {
-  const { register, checkUsername } = useAuth();
+export default function Register({ onSwitchToLogin, register, checkUsername }: RegisterProps) {
   const [step, setStep] = useState<"username" | "password">("username");
   const [username, setUsername] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
@@ -64,8 +64,11 @@ export default function Register({ onSwitchToLogin }: RegisterProps) {
     setLoading(true);
     setError(null);
     const err = await register(username.toLowerCase().trim(), password);
-    if (err) setError(err);
-    setLoading(false);
+    if (err) {
+      setError(err);
+      setLoading(false);
+    }
+    // If no error, AuthGate re-renders with user set
   };
 
   const passwordsMatch = confirm.length > 0 && password === confirm;
@@ -94,7 +97,7 @@ export default function Register({ onSwitchToLogin }: RegisterProps) {
 
           {/* Step indicator */}
           <div className="flex items-center gap-2 mb-6">
-            <div className={`flex-1 h-1 rounded-full transition-all duration-300 ${step === "username" ? "bg-primary" : "bg-primary"}`} />
+            <div className="flex-1 h-1 rounded-full bg-primary" />
             <div className={`flex-1 h-1 rounded-full transition-all duration-300 ${step === "password" ? "bg-primary" : "bg-zinc-800"}`} />
           </div>
 
