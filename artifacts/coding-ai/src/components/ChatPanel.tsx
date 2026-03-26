@@ -97,7 +97,9 @@ export function ChatPanel({ token, user, onUserUpdate }: ChatPanelProps) {
   const limitReached = !isOwner && user.questionsToday >= user.questionsLimit;
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const handleSend = async () => {

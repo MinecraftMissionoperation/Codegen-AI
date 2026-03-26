@@ -50,8 +50,12 @@ function AuthGate() {
 
   return (
     <Switch>
-      <Route path="/" component={() => <Home user={user} token={token} onLogout={logout} onUserUpdate={updateUserInfo} />} />
-      <Route component={NotFound} />
+      <Route path="/">
+        <Home user={user} token={token} onLogout={logout} onUserUpdate={updateUserInfo} />
+      </Route>
+      <Route>
+        <NotFound />
+      </Route>
     </Switch>
   );
 }
