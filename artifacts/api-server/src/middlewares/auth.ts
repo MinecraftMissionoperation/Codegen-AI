@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 export const JWT_SECRET = process.env.JWT_SECRET || "coding-ai-jwt-secret-key-change-in-production";
-export const DAILY_LIMIT = 5;
+export const DAILY_LIMIT = 10;
 export const OWNER_USERNAME = "missionoperation";
 
 export interface AuthPayload {
