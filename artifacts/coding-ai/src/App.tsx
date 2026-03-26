@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import NotFound from "@/pages/not-found";
+import { useAuth } from "@/hooks/use-auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,10 +18,28 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+function AuthGate() {
+  const { user, token, loading, logout, updateUserInfo } = useAuth();
+  const [authView, setAuthView] = useState<"login" | "register">("login");
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (authView === "register") {
+      return <Register onSwitchToLogin={() => setAuthView("login")} />;
+    }
+    return <Login onSwitchToRegister={() => setAuthView("register")} />;
+  }
+
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={() => <Home user={user} token={token} onLogout={logout} onUserUpdate={updateUserInfo} />} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -28,7 +50,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthGate />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

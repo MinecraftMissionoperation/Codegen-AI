@@ -1,39 +1,57 @@
 import { useState, useCallback, useRef } from "react";
 
-export function useCodegen() {
+export interface CodegenResult {
+  questionsToday?: number;
+  questionsLimit?: number;
+}
+
+export function useCodegen(token: string | null) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  
-  // Keep track of AbortController to allow cancelling
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const generate = useCallback(async (
-    prompt: string, 
-    language: string, 
-    onChunk?: (chunk: string) => void
+    prompt: string,
+    language: string,
+    onChunk?: (chunk: string) => void,
+    onDone?: (result: CodegenResult) => void,
   ) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     abortControllerRef.current = new AbortController();
     setIsGenerating(true);
     setCode("");
     setError(null);
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch("/api/codegen/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ prompt, language }),
         signal: abortControllerRef.current.signal,
       });
 
+      if (res.status === 401) {
+        setError("Your session has expired. Please log in again.");
+        return;
+      }
+
+      if (res.status === 429) {
+        const data = await res.json();
+        setError(data.error || "Daily question limit reached. Come back tomorrow!");
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(`Generation failed with status ${res.status}`);
       }
-      
+
       if (!res.body) {
         throw new Error("No response body returned from server");
       }
@@ -45,21 +63,24 @@ export function useCodegen() {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        
-        // Keep the last incomplete line in the buffer
         buffer = lines.pop() || "";
-        
+
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             const dataStr = line.slice(6).trim();
             if (!dataStr || dataStr === "[DONE]") continue;
-            
+
             try {
               const data = JSON.parse(dataStr);
               if (data.done) {
+                if (onDone) onDone({ questionsToday: data.questionsToday, questionsLimit: data.questionsLimit });
+                break;
+              }
+              if (data.error) {
+                setError(data.error);
                 break;
               }
               if (data.content) {
@@ -83,7 +104,7 @@ export function useCodegen() {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
-  }, []);
+  }, [token]);
 
   const stop = useCallback(() => {
     if (abortControllerRef.current) {

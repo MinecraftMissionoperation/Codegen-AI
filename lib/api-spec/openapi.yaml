@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -10,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
   - name: openai
     description: OpenAI AI chat, image, and audio operations
   - name: codegen
@@ -20,7 +21,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -28,6 +28,96 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/check-username:
+    post:
+      operationId: checkUsername
+      tags: [auth]
+      summary: Check if a username is available
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckUsernameBody"
+      responses:
+        "200":
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckUsernameResponse"
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+        "409":
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in to an existing account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
   /openai/conversations:
     get:
       operationId: listOpenaiConversations
@@ -159,6 +249,18 @@ paths:
           description: SSE stream of generated code chunks
           content:
             text/event-stream: {}
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+        "429":
+          description: Daily limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LimitError"
 components:
   schemas:
     HealthStatus:
@@ -168,6 +270,89 @@ components:
           type: string
       required:
         - status
+    CheckUsernameBody:
+      type: object
+      properties:
+        username:
+          type: string
+      required:
+        - username
+    CheckUsernameResponse:
+      type: object
+      properties:
+        available:
+          type: boolean
+      required:
+        - available
+    RegisterBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+    LoginBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+        - token
+        - user
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+        questionsToday:
+          type: integer
+        questionsLimit:
+          type: integer
+      required:
+        - id
+        - username
+        - role
+        - questionsToday
+        - questionsLimit
+    AuthError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    LimitError:
+      type: object
+      properties:
+        error:
+          type: string
+        questionsToday:
+          type: integer
+        questionsLimit:
+          type: integer
+      required:
+        - error
+        - questionsToday
+        - questionsLimit
     OpenaiConversation:
       type: object
       properties:
@@ -249,6 +434,5 @@ components:
           type: string
         language:
           type: string
-          description: Optional programming language hint
       required:
         - prompt

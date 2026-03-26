@@ -9,6 +9,47 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface CheckUsernameBody {
+  username: string;
+}
+
+export interface CheckUsernameResponse {
+  available: boolean;
+}
+
+export interface RegisterBody {
+  username: string;
+  password: string;
+}
+
+export interface LoginBody {
+  username: string;
+  password: string;
+}
+
+export interface UserInfo {
+  id: number;
+  username: string;
+  role: string;
+  questionsToday: number;
+  questionsLimit: number;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: UserInfo;
+}
+
+export interface AuthError {
+  error: string;
+}
+
+export interface LimitError {
+  error: string;
+  questionsToday: number;
+  questionsLimit: number;
+}
+
 export interface OpenaiConversation {
   id: number;
   title: string;
@@ -44,6 +85,5 @@ export interface OpenaiError {
 
 export interface GenerateCodeBody {
   prompt: string;
-  /** Optional programming language hint */
   language?: string;
 }

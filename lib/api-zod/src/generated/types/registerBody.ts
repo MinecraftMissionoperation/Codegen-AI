@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface GenerateCodeBody {
-  prompt: string;
-  language?: string;
+export interface RegisterBody {
+  username: string;
+  password: string;
 }

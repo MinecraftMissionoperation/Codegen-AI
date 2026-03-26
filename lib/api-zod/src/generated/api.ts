@@ -8,11 +8,59 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
+});
+
+/**
+ * @summary Check if a username is available
+ */
+export const CheckUsernameBody = zod.object({
+  username: zod.string(),
+});
+
+export const CheckUsernameResponse = zod.object({
+  available: zod.boolean(),
+});
+
+/**
+ * @summary Register a new account
+ */
+export const RegisterBody = zod.object({
+  username: zod.string(),
+  password: zod.string(),
+});
+
+/**
+ * @summary Log in to an existing account
+ */
+export const LoginBody = zod.object({
+  username: zod.string(),
+  password: zod.string(),
+});
+
+export const LoginResponse = zod.object({
+  token: zod.string(),
+  user: zod.object({
+    id: zod.number(),
+    username: zod.string(),
+    role: zod.string(),
+    questionsToday: zod.number(),
+    questionsLimit: zod.number(),
+  }),
+});
+
+/**
+ * @summary Get current authenticated user
+ */
+export const GetMeResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  role: zod.string(),
+  questionsToday: zod.number(),
+  questionsLimit: zod.number(),
 });
 
 /**
@@ -97,8 +145,5 @@ export const SendOpenaiMessageBody = zod.object({
  */
 export const GenerateCodeBody = zod.object({
   prompt: zod.string(),
-  language: zod
-    .string()
-    .optional()
-    .describe("Optional programming language hint"),
+  language: zod.string().optional(),
 });
