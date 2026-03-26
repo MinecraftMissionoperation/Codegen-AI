@@ -1,0 +1,4 @@
+packages:
+  "react-syntax-highlighter": "For rendering generated code with beautiful syntax highlighting"
+  "@types/react-syntax-highlighter": "Types for the syntax highlighter"
+  "framer-motion": "For premium smooth animations and state transitions"
