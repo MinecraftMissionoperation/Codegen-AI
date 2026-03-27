@@ -154,5 +154,5 @@ export function useChat(token: string | null) {
     setError(null);
   }, []);
 
-  return { messages, sendMessage, stop, isStreaming, error, setError, clearMessages };
+  return { messages, setMessages, sendMessage, stop, isStreaming, error, setError, clearMessages };
 }
