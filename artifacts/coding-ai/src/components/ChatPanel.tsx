@@ -1,18 +1,29 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, StopCircle, Bot, User, Sparkles, Copy, Check } from "lucide-react";
+import {
+  Send, StopCircle, Bot, User, Sparkles, Copy, Check,
+  Paperclip, X, FileText,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChatMessage } from "@/hooks/use-chat";
+import { ChatMessage, FileAttachment } from "@/hooks/use-chat";
 import { UserInfo } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+
+const ACCEPTED_EXTENSIONS = [
+  ".txt", ".md", ".csv", ".json", ".log", ".xml", ".yaml", ".yml", ".toml", ".env",
+  ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".c", ".cpp", ".cs", ".go",
+  ".rs", ".rb", ".php", ".swift", ".kt", ".r", ".sql", ".html", ".css",
+  ".sh", ".bash", ".mjs", ".cjs",
+];
+const MAX_FILE_SIZE = 500 * 1024; // 500 KB
 
 interface ChatPanelProps {
   user: UserInfo;
   messages: ChatMessage[];
   isStreaming: boolean;
   error: string | null;
-  onSendMessage: (msg: string, onDone?: (result: { questionsToday?: number }) => void) => void;
+  onSendMessage: (msg: string, fileAttachment?: FileAttachment | null, onDone?: (result: { questionsToday?: number }) => void) => void;
   onStop: () => void;
   onClearError: () => void;
   onUserUpdate: (info: Partial<UserInfo>) => void;
@@ -72,7 +83,15 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         }
       </div>
 
-      <div className={cn("flex-1 max-w-[80%] flex flex-col", isUser ? "items-end" : "items-start")}>
+      <div className={cn("flex-1 max-w-[80%] flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
+        {/* File attachment badge on user messages */}
+        {isUser && msg.attachedFile && (
+          <div className="flex items-center gap-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-400">
+            <FileText className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+            <span className="truncate max-w-[180px]">{msg.attachedFile.name}</span>
+          </div>
+        )}
+
         <div className={cn(
           "relative rounded-2xl px-4 py-3 text-sm",
           isUser
@@ -86,7 +105,9 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:300ms]" />
             </div>
           ) : isUser ? (
-            <div className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</div>
+            <div className="whitespace-pre-wrap break-words leading-relaxed">
+              {msg.content || <span className="text-zinc-500 italic">File attached</span>}
+            </div>
           ) : (
             <MarkdownContent content={msg.content} streaming={msg.streaming} />
           )}
@@ -114,14 +135,16 @@ export function ChatPanel({
   user, messages, isStreaming, error, onSendMessage, onStop, onClearError, onUserUpdate,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const [fileAttachment, setFileAttachment] = useState<FileAttachment | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isOwner = user.role === "owner";
   const questionsLeft = isOwner ? null : Math.max(0, user.questionsLimit - user.questionsToday);
   const limitReached = !isOwner && user.questionsToday >= user.questionsLimit;
 
-  // Scroll only within the messages container — never the page
   useEffect(() => {
     if (messages.length > 0 && scrollContainerRef.current) {
       const el = scrollContainerRef.current;
@@ -129,12 +152,51 @@ export function ChatPanel({
     }
   }, [messages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target.files) return;
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+
+    if (!file) return;
+
+    setFileError(null);
+
+    // Check extension
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+      setFileError(`Unsupported file type. Accepted: text, code, JSON, CSV, and similar files.`);
+      return;
+    }
+
+    // Check size
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError(`File is too large (max 500 KB). Please upload a smaller file.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      setFileAttachment({ name: file.name, content, mimeType: file.type || "text/plain" });
+    };
+    reader.onerror = () => setFileError("Could not read file.");
+    reader.readAsText(file);
+  };
+
+  const removeFile = () => {
+    setFileAttachment(null);
+    setFileError(null);
+  };
+
   const handleSend = () => {
-    if (!input.trim() || isStreaming || limitReached) return;
+    if ((!input.trim() && !fileAttachment) || isStreaming || limitReached) return;
     const msg = input.trim();
     setInput("");
+    setFileAttachment(null);
+    setFileError(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    onSendMessage(msg, (result) => {
+    onSendMessage(msg, fileAttachment, (result) => {
       if (result.questionsToday !== undefined) {
         onUserUpdate({ questionsToday: result.questionsToday });
       }
@@ -153,6 +215,8 @@ export function ChatPanel({
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
+
+  const canSend = (!!input.trim() || !!fileAttachment) && !isStreaming && !limitReached;
 
   return (
     <div className="flex flex-col h-full bg-zinc-950/30 rounded-2xl border border-white/5 overflow-hidden">
@@ -177,7 +241,7 @@ export function ChatPanel({
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-400">Ask me anything</p>
-              <p className="text-xs text-zinc-600 mt-1">Math, science, writing, trivia, analysis...</p>
+              <p className="text-xs text-zinc-600 mt-1">Math, science, writing, trivia, analysis — or upload a file to analyze</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center mt-2">
               {["What's the speed of light?", "Explain quantum entanglement", "Write a haiku about coding"].map((s) => (
@@ -201,33 +265,85 @@ export function ChatPanel({
         )}
       </div>
 
-      {/* Error */}
-      {error && (
+      {/* Error / limit banners */}
+      {(error || fileError) && (
         <div className="mx-4 mb-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg flex items-center justify-between flex-shrink-0">
-          <span>{error}</span>
-          <button type="button" onClick={onClearError} className="text-red-400/70 hover:text-red-400 ml-2">✕</button>
+          <span>{fileError || error}</span>
+          <button type="button" onClick={() => { onClearError(); setFileError(null); }} className="text-red-400/70 hover:text-red-400 ml-2">✕</button>
         </div>
       )}
 
-      {limitReached && !error && (
+      {limitReached && !error && !fileError && (
         <div className="mx-4 mb-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-2 rounded-lg flex-shrink-0">
-          You've used all 10 daily questions. Resets at midnight!
+          You've used all {user.questionsLimit} daily questions. Resets at midnight!
+        </div>
+      )}
+
+      {/* File attachment preview */}
+      {fileAttachment && (
+        <div className="mx-4 mb-1 flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 flex-shrink-0">
+          <FileText className="w-4 h-4 text-primary/70 flex-shrink-0" />
+          <span className="text-xs text-zinc-300 truncate flex-1">{fileAttachment.name}</span>
+          <span className="text-xs text-zinc-600 flex-shrink-0">
+            {(fileAttachment.content.length / 1024).toFixed(1)} KB
+          </span>
+          <button
+            type="button"
+            onClick={removeFile}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0 ml-1"
+            title="Remove file"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
       {/* Input */}
       <div className="p-3 border-t border-white/5 flex-shrink-0">
         <div className="flex items-end gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary transition-all">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_EXTENSIONS.join(",")}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Paperclip button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming || limitReached}
+            title="Attach a file"
+            className={cn(
+              "p-1.5 rounded-lg transition-all flex-shrink-0 mb-0.5",
+              fileAttachment
+                ? "text-primary bg-primary/20"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800",
+              (isStreaming || limitReached) && "opacity-40 cursor-not-allowed"
+            )}
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
           <textarea
             ref={textareaRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={limitReached ? "Daily limit reached. Come back tomorrow!" : "Ask anything... (Enter to send, Shift+Enter for new line)"}
+            placeholder={
+              limitReached
+                ? "Daily limit reached. Come back tomorrow!"
+                : fileAttachment
+                ? "Add a question about the file, or just press send..."
+                : "Ask anything... (Enter to send, Shift+Enter for new line)"
+            }
             disabled={isStreaming || limitReached}
             rows={1}
             className="flex-1 bg-transparent resize-none text-sm text-foreground placeholder:text-zinc-600 focus:outline-none disabled:opacity-50 max-h-40 py-1"
           />
+
           {isStreaming ? (
             <button type="button" onClick={onStop}
               className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all flex-shrink-0">
@@ -235,12 +351,16 @@ export function ChatPanel({
             </button>
           ) : (
             <button type="button" onClick={handleSend}
-              disabled={!input.trim() || limitReached}
+              disabled={!canSend}
               className="p-2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0">
               <Send className="w-4 h-4" />
             </button>
           )}
         </div>
+
+        <p className="text-center text-xs text-zinc-700 mt-1.5">
+          Supports .txt, .py, .js, .ts, .json, .csv, .md and more · Max 500 KB
+        </p>
       </div>
     </div>
   );

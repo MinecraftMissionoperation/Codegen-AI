@@ -1,10 +1,17 @@
 import { useState, useCallback, useRef } from "react";
 
+export interface FileAttachment {
+  name: string;
+  content: string;
+  mimeType: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
+  attachedFile?: { name: string; mimeType: string };
 }
 
 export interface ChatResult {
@@ -20,9 +27,11 @@ export function useChat(token: string | null) {
 
   const sendMessage = useCallback(async (
     content: string,
+    fileAttachment?: FileAttachment | null,
     onDone?: (result: ChatResult) => void,
   ) => {
-    if (!content.trim() || isStreaming) return;
+    if (!content.trim() && !fileAttachment) return;
+    if (isStreaming) return;
 
     setError(null);
 
@@ -30,6 +39,7 @@ export function useChat(token: string | null) {
       id: Date.now().toString(),
       role: "user",
       content,
+      attachedFile: fileAttachment ? { name: fileAttachment.name, mimeType: fileAttachment.mimeType } : undefined,
     };
 
     const assistantId = (Date.now() + 1).toString();
@@ -40,17 +50,20 @@ export function useChat(token: string | null) {
       streaming: true,
     };
 
-    setMessages((prev) => {
-      // Build history from previous messages (excluding any currently streaming ones)
-      return [...prev, userMsg, assistantMsg];
-    });
-
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setIsStreaming(true);
     abortRef.current = new AbortController();
 
     try {
-      // Build history (exclude the new user message and the empty assistant placeholder)
       const history = messages.map(m => ({ role: m.role, content: m.content }));
+
+      // Format the message sent to the API — include file content inline
+      let apiMessage = content;
+      if (fileAttachment) {
+        const ext = fileAttachment.name.split(".").pop() || "";
+        const codeBlock = ext ? `\`\`\`${ext}\n${fileAttachment.content}\n\`\`\`` : fileAttachment.content;
+        apiMessage = `[Attached file: ${fileAttachment.name}]\n${codeBlock}${content ? `\n\nUser question: ${content}` : ""}`;
+      }
 
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -58,7 +71,7 @@ export function useChat(token: string | null) {
       const res = await fetch("/api/chat/message", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: content, history }),
+        body: JSON.stringify({ message: apiMessage, history }),
         signal: abortRef.current.signal,
       });
 
@@ -96,7 +109,6 @@ export function useChat(token: string | null) {
           if (line.startsWith("data: ")) {
             const dataStr = line.slice(6).trim();
             if (!dataStr) continue;
-
             try {
               const data = JSON.parse(dataStr);
               if (data.done) {
@@ -110,9 +122,7 @@ export function useChat(token: string | null) {
               if (data.content) {
                 fullContent += data.content;
                 setMessages((prev) =>
-                  prev.map(m =>
-                    m.id === assistantId ? { ...m, content: fullContent } : m
-                  )
+                  prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m)
                 );
               }
             } catch {}
@@ -120,11 +130,8 @@ export function useChat(token: string | null) {
         }
       }
 
-      // Mark as no longer streaming
       setMessages((prev) =>
-        prev.map(m =>
-          m.id === assistantId ? { ...m, streaming: false } : m
-        )
+        prev.map(m => m.id === assistantId ? { ...m, streaming: false } : m)
       );
     } catch (err: any) {
       if (err.name !== "AbortError") {
@@ -142,7 +149,6 @@ export function useChat(token: string | null) {
       abortRef.current.abort();
       abortRef.current = null;
       setIsStreaming(false);
-      // Mark last message as done
       setMessages((prev) =>
         prev.map(m => m.streaming ? { ...m, streaming: false } : m)
       );
