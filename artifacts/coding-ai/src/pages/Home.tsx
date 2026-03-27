@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 const LANGUAGES = [
   "TypeScript", "JavaScript", "Python", "Rust", "Go",
   "Java", "C++", "C#", "SQL", "Bash", "HTML", "CSS", "JSON",
+  "Ruby", "PHP", "Swift", "Kotlin", "R",
 ];
 
 type Tab = "code" | "chat";

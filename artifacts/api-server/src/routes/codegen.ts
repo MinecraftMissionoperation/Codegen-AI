@@ -33,7 +33,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     // Enforce daily limit for non-owners
     if (!isOwner && questionsToday >= DAILY_LIMIT) {
       res.status(429).json({
-        error: "You've used all 5 of your daily questions. Come back tomorrow!",
+        error: `You've used all ${DAILY_LIMIT} of your daily questions. Come back tomorrow!`,
         questionsToday,
         questionsLimit: DAILY_LIMIT,
       });
@@ -51,12 +51,12 @@ router.post("/generate", requireAuth, async (req, res) => {
 
     // Owners get the best model, normal users get a capable model
     const model = isOwner ? "gpt-5.2" : "gpt-5.1";
-    const languageHint = language ? ` Use ${language}.` : "";
-    const systemPrompt = `You are an expert software engineer and coding assistant. When given a description, generate clean, well-structured, working code.${languageHint} Output only the code, no explanations unless the user asks. Use proper formatting and comments where helpful.`;
+    const languageHint = language ? ` Write the code in ${language}.` : "";
+    const systemPrompt = `You are an expert software engineer. When given a description, generate complete, fully working code from start to finish — never stop mid-way through.${languageHint} Always close every function, class, bracket, and block. Output only the code with no explanations. Use clear formatting and add brief inline comments where helpful.`;
 
     const stream = await openai.chat.completions.create({
       model,
-      max_completion_tokens: 8192,
+      max_completion_tokens: 16000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
